@@ -190,13 +190,38 @@
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="MainGame.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
-    </ClCompile>
+    <ClCompile Include="MainGame.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Play.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Data\Backgrounds\background.png" />
+    <Image Include="Data\Sprites\agent8_climb_4.png" />
+    <Image Include="Data\Sprites\agent8_fall.png" />
+    <Image Include="Data\Sprites\agent8_halt_7.png" />
+    <Image Include="Data\Sprites\agent8_hang_2.png" />
+    <Image Include="Data\Sprites\coin.png" />
+    <Image Include="Data\Sprites\coins_2.png" />
+    <Image Include="Data\Sprites\driver.png" />
+    <Image Include="Data\Sprites\fan_3.png" />
+    <Image Include="Data\Sprites\font32px_10x10.png" />
+    <Image Include="Data\Sprites\font64px_10x10.png" />
+    <Image Include="Data\Sprites\font72px_10x10.png" />
+    <Image Include="Data\Sprites\laser_2.png" />
+    <Image Include="Data\Sprites\spanner.png" />
+    <Image Include="Data\Sprites\star.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Media Include="Data\Audio\snd_collect.wav" />
+    <Media Include="Data\Audio\snd_die.wav" />
+    <Media Include="Data\Audio\snd_error.wav" />
+    <Media Include="Data\Audio\snd_explode.wav" />
+    <Media Include="Data\Audio\snd_fan.wav" />
+    <Media Include="Data\Audio\snd_march.wav" />
+    <Media Include="Data\Audio\snd_music.wav" />
+    <Media Include="Data\Audio\snd_shoot.wav" />
+    <Media Include="Data\Audio\snd_tool.wav" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
