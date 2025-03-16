@@ -1,11 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <Filter Include="Header Files">
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource">
+      <UniqueIdentifier>{73f523d0-c068-4689-ac1b-d39c3eb70b6a}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source Files">
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Header Files">
-      <Extensions>h;hh;hpp;hxx;hm;inl;inc;ipp;xsd</Extensions>
+    <Filter Include="Resource\Audio">
+      <UniqueIdentifier>{26853b3a-b752-42f4-8812-2374c350d11e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource\Backgrounds">
+      <UniqueIdentifier>{54529cd3-2e3f-400c-a6e5-cf3e77d29f40}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource\Sprites">
+      <UniqueIdentifier>{b82bcb24-ba8e-49bf-9293-340f4355aa95}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -14,8 +26,87 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\PlayBuffer\Play.h">
+    <ClInclude Include="..\Play.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Data\Sprites\agent8_climb_4.png">
+      <Filter>Resource\Sprites</Filter>
+    </Image>
+    <Image Include="Data\Sprites\agent8_fall.png">
+      <Filter>Resource\Sprites</Filter>
+    </Image>
+    <Image Include="Data\Sprites\agent8_halt_7.png">
+      <Filter>Resource\Sprites</Filter>
+    </Image>
+    <Image Include="Data\Sprites\agent8_hang_2.png">
+      <Filter>Resource\Sprites</Filter>
+    </Image>
+    <Image Include="Data\Sprites\coin.png">
+      <Filter>Resource\Sprites</Filter>
+    </Image>
+    <Image Include="Data\Sprites\coins_2.png">
+      <Filter>Resource\Sprites</Filter>
+    </Image>
+    <Image Include="Data\Sprites\driver.png">
+      <Filter>Resource\Sprites</Filter>
+    </Image>
+    <Image Include="Data\Sprites\fan_3.png">
+      <Filter>Resource\Sprites</Filter>
+    </Image>
+    <Image Include="Data\Sprites\font32px_10x10.png">
+      <Filter>Resource\Sprites</Filter>
+    </Image>
+    <Image Include="Data\Sprites\font64px_10x10.png">
+      <Filter>Resource\Sprites</Filter>
+    </Image>
+    <Image Include="Data\Sprites\font72px_10x10.png">
+      <Filter>Resource\Sprites</Filter>
+    </Image>
+    <Image Include="Data\Sprites\laser_2.png">
+      <Filter>Resource\Sprites</Filter>
+    </Image>
+    <Image Include="Data\Sprites\spanner.png">
+      <Filter>Resource\Sprites</Filter>
+    </Image>
+    <Image Include="Data\Sprites\star.png">
+      <Filter>Resource\Sprites</Filter>
+    </Image>
+    <Image Include="Data\Backgrounds\background.png">
+      <Filter>Resource\Backgrounds</Filter>
+    </Image>
+    <Image Include="Data\Sprites\aa_playbuffer_title.png">
+      <Filter>Resource\Sprites</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <Media Include="Data\Audio\snd_collect.wav">
+      <Filter>Resource\Audio</Filter>
+    </Media>
+    <Media Include="Data\Audio\snd_die.wav">
+      <Filter>Resource\Audio</Filter>
+    </Media>
+    <Media Include="Data\Audio\snd_error.wav">
+      <Filter>Resource\Audio</Filter>
+    </Media>
+    <Media Include="Data\Audio\snd_explode.wav">
+      <Filter>Resource\Audio</Filter>
+    </Media>
+    <Media Include="Data\Audio\snd_fan.wav">
+      <Filter>Resource\Audio</Filter>
+    </Media>
+    <Media Include="Data\Audio\snd_march.wav">
+      <Filter>Resource\Audio</Filter>
+    </Media>
+    <Media Include="Data\Audio\snd_music.wav">
+      <Filter>Resource\Audio</Filter>
+    </Media>
+    <Media Include="Data\Audio\snd_shoot.wav">
+      <Filter>Resource\Audio</Filter>
+    </Media>
+    <Media Include="Data\Audio\snd_tool.wav">
+      <Filter>Resource\Audio</Filter>
+    </Media>
   </ItemGroup>
 </Project>
