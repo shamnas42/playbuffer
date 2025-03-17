@@ -18,7 +18,10 @@ struct GameState
 {
     int score{ 0 };
     float timer = 0;
+
     bool bIsInMenu = true; 
+    int playerMenuChoice = 1;
+
     Agent8State agentState{ STATE_APPEAR };
 };
 
@@ -43,7 +46,7 @@ void UpdateCoinsAndStars();
 void UpdateLasers();
 void UpdateDestroyed();
 void UpdateAgent8();
-void HandleMainMenu();
+bool HandleMainMenu();
 
 // The entry point for a PlayBuffer program 
 void MainGameEntry(PLAY_IGNORE_COMMAND_LINE)
@@ -81,7 +84,7 @@ bool MainGameUpdate(float elapsedTime)
     }
     else if (gameState.timer > 4)
     {
-        HandleMainMenu();
+        return HandleMainMenu();
     }
     else
     {
@@ -367,24 +370,118 @@ void UpdateAgent8()
     Play::DrawObjectRotated(obj_agent8);
 }
 
-void HandleMainMenu()
+bool HandleMainMenu()
 {
     Play::ClearDrawingBuffer(Play::cBlack);
+
+    Play::DrawFontText("72px", "Menu",
+        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 6 * 5 }, Play::CENTRE);
     
-    Play::DrawFontText("32px", "Play",
+    Play::DrawFontText("64px", "Play",
         { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 6 * 4 }, Play::CENTRE);
 
-    Play::DrawFontText("32px", "Leaderboard",
+    Play::DrawFontText("64px", "Leaderboard",
         { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 6 * 3 }, Play::CENTRE);
 
-    Play::DrawFontText("32px", "Quit",
+    Play::DrawFontText("64px", "Quit",
         { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 6 * 2 }, Play::CENTRE);
 
+    Play::DrawFontText("32px", "Press Enter To Select",
+        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 6 }, Play::CENTRE);
+    
+    
+    if (Play::KeyPressed(Play::KEY_DOWN) && gameState.playerMenuChoice < 3)
+    {
+        gameState.playerMenuChoice++;
+    }
+    else if (Play::KeyPressed(Play::KEY_UP) && gameState.playerMenuChoice > 1)
+    {
+        gameState.playerMenuChoice--;
+    }
+
+
+    switch (gameState.playerMenuChoice) {
+        case 1:
+        {
+            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 6 * 4 }, 0);
+            if (Play::KeyPressed(Play::KEY_ENTER))
+            {
+                gameState.bIsInMenu = false;
+            }
+            break;
+        }
+        case 2:
+        {
+            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 6 * 3 }, 0);
+            if (Play::KeyPressed(Play::KEY_ENTER))
+            {
+                
+            }
+            break;
+        }
+        case 3:
+        {
+            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 6 * 2 }, 0);
+            if (Play::KeyPressed(Play::KEY_ENTER))
+            {
+                return true; 
+            }
+            break;
+        }
+        default:
+        {
+            
+        }
+    }
+
     Play::PresentDrawingBuffer();
-
-
+    return false; 
 }
 
+/*
 
+
+GameObject& obj_agent8 = Play::GetGameObjectByType(TYPE_AGENT8);
+    if (Play::KeyDown(Play::KEY_UP))
+    {
+        obj_agent8.velocity = { 0, 4 };
+        Play::SetSprite(obj_agent8, "agent8_climb", 0.25f);
+    }
+    else if (Play::KeyDown(Play::KEY_DOWN))
+    {
+        obj_agent8.acceleration = { 0, -1 };
+        Play::SetSprite(obj_agent8, "agent8_fall", 0);
+    }
+    else
+    {
+        if (obj_agent8.velocity.y < -5)
+        {
+            gameState.agentState = STATE_HALT;
+            Play::SetSprite(obj_agent8, "agent8_halt", 0.333f);
+            obj_agent8.acceleration = { 0, 0 };
+        }
+        else
+        {
+            Play::SetSprite(obj_agent8, "agent8_hang", 0.02f);
+            obj_agent8.velocity *= 0.5f;
+            obj_agent8.acceleration = { 0, 0 };
+        }
+    }
+    if (Play::KeyPressed(Play::KEY_SPACE))
+    {
+        Vector2D firePos = obj_agent8.pos + Vector2D(155, 75);
+        int id = Play::CreateGameObject(TYPE_LASER, firePos, 30, "laser");
+        Play::GetGameObject(id).velocity = { 32, 0 };
+        Play::PlayAudio("shoot");
+    }
+    Play::UpdateGameObject(obj_agent8);
+
+    if (Play::IsLeavingDisplayArea(obj_agent8))
+        obj_agent8.pos = obj_agent8.oldPos;
+
+    Play::DrawLine({ obj_agent8.pos.x, 720 }, obj_agent8.pos, Play::cWhite);
+    Play::DrawObjectRotated(obj_agent8);
+
+*/
 
 
