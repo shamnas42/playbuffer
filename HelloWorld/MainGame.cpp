@@ -1,6 +1,7 @@
 #define PLAY_IMPLEMENTATION
 #define PLAY_USING_GAMEOBJECT_MANAGER
 #include "Play.h"
+#include <fstream>
 
 int DISPLAY_WIDTH = 1280;
 int DISPLAY_HEIGHT = 720;
@@ -14,15 +15,27 @@ enum Agent8State
     STATE_DEAD,
 };
 
+enum GameloopScreen
+{
+    SLPASH_SCREEN = 0,
+    MAIN_MENU,
+    GAME_SCENE,
+    LEADERBOARD,
+    END_SCREEN,
+};
+
 struct GameState
 {
-    int score{ 0 };
     float timer = 0;
 
-    bool bIsInMenu = true; 
+    int score{ 0 };
+
     int playerMenuChoice = 1;
+    int playerLeaderboardChoice = 1;
+    int playerEndScreenChoice = 1;
 
     Agent8State agentState{ STATE_APPEAR };
+    GameloopScreen gameScreen{ SLPASH_SCREEN };
 };
 
 GameState gameState;
@@ -47,6 +60,11 @@ void UpdateLasers();
 void UpdateDestroyed();
 void UpdateAgent8();
 bool HandleMainMenu();
+bool HandleEndScreen();
+void HandleGame();
+void HandleSplashScreen(float elapsedTime);
+void HandleGameReset();
+
 
 // The entry point for a PlayBuffer program 
 void MainGameEntry(PLAY_IGNORE_COMMAND_LINE)
@@ -64,34 +82,44 @@ void MainGameEntry(PLAY_IGNORE_COMMAND_LINE)
 // Called by the PlayBuffer once every frame (60 times a second!) 
 bool MainGameUpdate(float elapsedTime)
 {
-    gameState.timer += elapsedTime;
-    if (gameState.timer > 4 && !gameState.bIsInMenu)
+    switch (gameState.gameScreen)
     {
-        Play::DrawBackground();
-        UpdateAgent8(); // Replaces HandlePlayerControls() in MainGameUpdate()
-        UpdateFan();
-        UpdateTools();
-        UpdateCoinsAndStars();
-        UpdateLasers();
-        UpdateDestroyed();
-        Play::DrawFontText("32px", "ARROW KEYS TO MOVE UP AND DOWN AND SPACE TO FIRE",
-            { DISPLAY_WIDTH / 2, 40 }, Play::CENTRE);
-        Play::DrawFontText("72px", "SCORE: " + std::to_string(gameState.score),
-            { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT - 80 }, Play::CENTRE);
-        Play::DrawFontText("32px", std::to_string(gameState.timer),
-            { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 }, Play::CENTRE);
-        Play::PresentDrawingBuffer();
+        case SLPASH_SCREEN:
+        {
+            HandleSplashScreen(elapsedTime);
+            break;
+        }
+
+        case MAIN_MENU:
+        {
+            return HandleMainMenu();
+            break;
+        }
+
+        case GAME_SCENE:
+        {
+            HandleGame();
+            break;
+        }
+
+        case LEADERBOARD:
+        {
+
+            break;
+        }
+
+        case END_SCREEN:
+        {
+            return HandleEndScreen();
+            break;
+        }
+
+        default:
+        {
+            return true;
+        }
     }
-    else if (gameState.timer > 4)
-    {
-        return HandleMainMenu();
-    }
-    else
-    {
-        Play::ClearDrawingBuffer(Play::cBlack);
-        Play::DrawSprite(0, { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2}, gameState.timer);
-        Play::PresentDrawingBuffer();
-    }
+
     return Play::KeyDown(Play::KEY_ESCAPE);
 }
 
@@ -345,18 +373,9 @@ void UpdateAgent8()
         case STATE_DEAD:
             obj_agent8.acceleration = { -0.3f , 0.5f };
             obj_agent8.rotation += 0.25f;
-            if (Play::KeyPressed(Play::KEY_SPACE) == true)
-            {
-                gameState.agentState = STATE_APPEAR;
-                obj_agent8.pos = { 115, 600 };
-                obj_agent8.velocity = { 0, 0 };
-                obj_agent8.frame = 0;
-                Play::StartAudioLoop("music");
-                gameState.score = 0;
 
-                for (int id_obj : Play::CollectGameObjectIDsByType(TYPE_TOOL))
-                    Play::GetGameObject(id_obj).type = TYPE_DESTROYED;
-            }
+            gameState.gameScreen = END_SCREEN; 
+            
             break;
 
     } // End of switch on Agent8State 
@@ -374,6 +393,7 @@ bool HandleMainMenu()
 {
     Play::ClearDrawingBuffer(Play::cBlack);
 
+    // Menu Options 
     Play::DrawFontText("72px", "Menu",
         { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 6 * 5 }, Play::CENTRE);
     
@@ -389,7 +409,7 @@ bool HandleMainMenu()
     Play::DrawFontText("32px", "Press Enter To Select",
         { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 6 }, Play::CENTRE);
     
-    
+    // Input For Choosing Option 
     if (Play::KeyPressed(Play::KEY_DOWN) && gameState.playerMenuChoice < 3)
     {
         gameState.playerMenuChoice++;
@@ -399,28 +419,28 @@ bool HandleMainMenu()
         gameState.playerMenuChoice--;
     }
 
-
+    // Results for Chooing Option 
     switch (gameState.playerMenuChoice) {
         case 1:
         {
+            // Play 
             Play::DrawSprite(12, { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 6 * 4 }, 0);
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
-                gameState.bIsInMenu = false;
+                gameState.gameScreen = GAME_SCENE;
             }
             break;
         }
         case 2:
         {
+            // Leaderboard 
             Play::DrawSprite(12, { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 6 * 3 }, 0);
-            if (Play::KeyPressed(Play::KEY_ENTER))
-            {
-                
-            }
+
             break;
         }
         case 3:
         {
+            // Quit
             Play::DrawSprite(12, { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 6 * 2 }, 0);
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
@@ -430,7 +450,7 @@ bool HandleMainMenu()
         }
         default:
         {
-            
+            return true;
         }
     }
 
@@ -438,50 +458,141 @@ bool HandleMainMenu()
     return false; 
 }
 
-/*
+bool HandleEndScreen()
+{
+    Play::ClearDrawingBuffer(Play::cBlack);
 
+    // Menu Options 
+    Play::DrawFontText("72px", "You Have Died",
+        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 8 * 7 }, Play::CENTRE);
+    Play::DrawFontText("64px", "Your Score Is: " + std::to_string(gameState.score),
+        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 8 * 6 }, Play::CENTRE);
+    Play::DrawFontText("64px", "Retry",
+        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 8 * 5 }, Play::CENTRE);
+    Play::DrawFontText("64px", "Leaderboard",
+        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 8 * 4 }, Play::CENTRE);
+    Play::DrawFontText("64px", "Menu",
+        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 8 * 3 }, Play::CENTRE);
+    Play::DrawFontText("64px", "Quit",
+        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 8 * 2 }, Play::CENTRE);
+    Play::DrawFontText("32px", "Press Enter To Select",
+        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 8 }, Play::CENTRE);
 
-GameObject& obj_agent8 = Play::GetGameObjectByType(TYPE_AGENT8);
-    if (Play::KeyDown(Play::KEY_UP))
+    // Input For Choosing Option 
+    if (Play::KeyPressed(Play::KEY_DOWN) && gameState.playerEndScreenChoice < 4)
     {
-        obj_agent8.velocity = { 0, 4 };
-        Play::SetSprite(obj_agent8, "agent8_climb", 0.25f);
+        gameState.playerEndScreenChoice++;
     }
-    else if (Play::KeyDown(Play::KEY_DOWN))
+    else if (Play::KeyPressed(Play::KEY_UP) && gameState.playerEndScreenChoice > 1)
     {
-        obj_agent8.acceleration = { 0, -1 };
-        Play::SetSprite(obj_agent8, "agent8_fall", 0);
+        gameState.playerEndScreenChoice--;
     }
-    else
-    {
-        if (obj_agent8.velocity.y < -5)
+
+    // Results for Chooing Option 
+    switch (gameState.playerEndScreenChoice) {
+        case 1:
         {
-            gameState.agentState = STATE_HALT;
-            Play::SetSprite(obj_agent8, "agent8_halt", 0.333f);
-            obj_agent8.acceleration = { 0, 0 };
+            // Retry 
+            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 8 * 5 }, 0);
+
+            if (Play::KeyPressed(Play::KEY_ENTER))
+            {
+                HandleGameReset();
+                gameState.gameScreen = GAME_SCENE;
+            }
+            break;
         }
-        else
+        case 2:
         {
-            Play::SetSprite(obj_agent8, "agent8_hang", 0.02f);
-            obj_agent8.velocity *= 0.5f;
-            obj_agent8.acceleration = { 0, 0 };
+            // Leaderboard 
+            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 8 * 4 }, 0);
+
+
+            break;
+        }
+        case 3:
+        {
+            // Menu 
+            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 8 * 3 }, 0);
+
+            if (Play::KeyPressed(Play::KEY_ENTER))
+            {
+                HandleGameReset();
+                gameState.gameScreen = MAIN_MENU;
+                
+            }
+            break;
+        }
+        case 4:
+        {
+            // Quit 
+            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 8 * 2 }, 0);
+
+            if (Play::KeyPressed(Play::KEY_ENTER))
+            {
+                return true;
+            }
+            break;
+        }
+        default:
+        {
+            // Ends if there is a error in menu 
+            return true; 
         }
     }
-    if (Play::KeyPressed(Play::KEY_SPACE))
+
+    Play::PresentDrawingBuffer();
+
+    return false; 
+}
+
+void HandleGame()
+{
+    Play::DrawBackground();
+    UpdateAgent8(); // Replaces HandlePlayerControls() in MainGameUpdate()
+    UpdateFan();
+    UpdateTools();
+    UpdateCoinsAndStars();
+    UpdateLasers();
+    UpdateDestroyed();
+    Play::DrawFontText("32px", "ARROW KEYS TO MOVE UP AND DOWN AND SPACE TO FIRE",
+        { DISPLAY_WIDTH / 2, 40 }, Play::CENTRE);
+    Play::DrawFontText("72px", "SCORE: " + std::to_string(gameState.score),
+        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT - 80 }, Play::CENTRE);
+    Play::DrawFontText("32px", std::to_string(gameState.timer),
+        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 }, Play::CENTRE);
+    Play::PresentDrawingBuffer();
+}
+
+void HandleSplashScreen(float elapsedTime)
+{
+    gameState.timer += elapsedTime;
+
+    Play::ClearDrawingBuffer(Play::cBlack);
+    Play::DrawSprite(0, { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 }, gameState.timer);
+    Play::PresentDrawingBuffer();
+    if (gameState.timer > 4)
     {
-        Vector2D firePos = obj_agent8.pos + Vector2D(155, 75);
-        int id = Play::CreateGameObject(TYPE_LASER, firePos, 30, "laser");
-        Play::GetGameObject(id).velocity = { 32, 0 };
-        Play::PlayAudio("shoot");
+        gameState.gameScreen = MAIN_MENU;
     }
-    Play::UpdateGameObject(obj_agent8);
+}
 
-    if (Play::IsLeavingDisplayArea(obj_agent8))
-        obj_agent8.pos = obj_agent8.oldPos;
+void HandleGameReset()
+{
+    GameObject& obj_agent8 = Play::GetGameObjectByType(TYPE_AGENT8);
 
-    Play::DrawLine({ obj_agent8.pos.x, 720 }, obj_agent8.pos, Play::cWhite);
-    Play::DrawObjectRotated(obj_agent8);
+    gameState.agentState = STATE_APPEAR;
 
-*/
+    obj_agent8.pos = { 115, 600 };
+    obj_agent8.velocity = { 0, 0 };
+    obj_agent8.frame = 0;
+    Play::StartAudioLoop("music");
+    gameState.score = 0;
 
+    for (int id_obj : Play::CollectGameObjectIDsByType(TYPE_TOOL))
+        Play::GetGameObject(id_obj).type = TYPE_DESTROYED;
+
+    for (int id_obj : Play::CollectGameObjectIDsByType(TYPE_COIN))
+        Play::GetGameObject(id_obj).type = TYPE_DESTROYED;
+}
 

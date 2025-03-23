@@ -24,7 +24,7 @@
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>HelloWorld</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>HelloWorld</ProjectName>
+    <ProjectName>Play Buffer Game</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -223,6 +223,9 @@
     <Media Include="Data\Audio\snd_music.wav" />
     <Media Include="Data\Audio\snd_shoot.wav" />
     <Media Include="Data\Audio\snd_tool.wav" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Leaderboard.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
