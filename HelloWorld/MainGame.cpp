@@ -2,6 +2,7 @@
 #define PLAY_USING_GAMEOBJECT_MANAGER
 #include "Play.h"
 #include <fstream>
+#include <algorithm>
 
 // Game Screen Size
 int DISPLAY_WIDTH = 1280;
@@ -41,6 +42,11 @@ struct GameState
     int playerLeaderboardChoice = 1;
     int playerEndScreenChoice = 1;
 
+    bool isMusicOn = true; 
+
+    //Leaderboard Information 
+    std::vector<int> leaderboardTopScore;
+
     // States for Agent And Scenes 
     Agent8State agentState{ STATE_APPEAR };
     GameloopScreen gameScreen{ SLPASH_SCREEN };
@@ -74,8 +80,10 @@ void GameloopSplashScreen(float elapsedTime);
 bool GameloopMainMenu();
 void GameloopGameScene();
 bool GameloopEndScreen();
-void HandleGameReset();
-
+void ResetGameScreen();
+void SetUpLeaderBoard();
+void UploadScore();
+bool GameloopLeaderBoard();
 
 // Entry Point 
 void MainGameEntry(PLAY_IGNORE_COMMAND_LINE)
@@ -89,6 +97,8 @@ void MainGameEntry(PLAY_IGNORE_COMMAND_LINE)
     int id_fan = Play::CreateGameObject(TYPE_FAN, { 1140, 503 }, 0, "fan");
     Play::GetGameObject(id_fan).velocity = { 0, -3 };
     Play::GetGameObject(id_fan).animSpeed = 1.0f;
+    SetUpLeaderBoard();
+    
 }
 
 // Updates Game Every 60 Times Per Second 
@@ -117,7 +127,7 @@ bool MainGameUpdate(float elapsedTime)
 
         case LEADERBOARD:
         {
-
+            return GameloopLeaderBoard();
             break;
         }
 
@@ -276,6 +286,7 @@ void UpdateTools()
             Play::StopAudio("music");
             Play::PlayAudio("die");
             gameState.agentState = STATE_DEAD;
+            gameState.isMusicOn = false;
         }
         Play::UpdateGameObject(obj_tool);
 
@@ -499,6 +510,8 @@ void UpdateAgent8()
             // Goes To End Screen When Dead 
             gameState.gameScreen = END_SCREEN;
 
+            UploadScore();
+
             break;
         }
     } 
@@ -554,6 +567,7 @@ bool GameloopMainMenu()
 
     Play::DrawFontText("32px", "Press Enter To Select",
         { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 6 }, Play::CENTRE);
+
     
     // Input For Choosing Option 
     if (Play::KeyPressed(Play::KEY_DOWN) && gameState.playerMenuChoice < 3)
@@ -581,6 +595,11 @@ bool GameloopMainMenu()
         {
             // Leaderboard 
             Play::DrawSprite(12, { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 6 * 3 }, 0);
+
+            if (Play::KeyPressed(Play::KEY_ENTER))
+            {
+                gameState.gameScreen = LEADERBOARD;
+            }
 
             break;
         }
@@ -668,7 +687,7 @@ bool GameloopEndScreen()
 
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
-                HandleGameReset();
+                ResetGameScreen();
                 gameState.gameScreen = GAME_SCENE;
             }
             break;
@@ -678,6 +697,10 @@ bool GameloopEndScreen()
             // Leaderboard 
             Play::DrawSprite(12, { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 8 * 4 }, 0);
 
+            if (Play::KeyPressed(Play::KEY_ENTER))
+            {
+                gameState.gameScreen = LEADERBOARD;
+            }
 
             break;
         }
@@ -688,7 +711,7 @@ bool GameloopEndScreen()
 
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
-                HandleGameReset();
+                ResetGameScreen();
                 gameState.gameScreen = MAIN_MENU;
                 
             }
@@ -719,7 +742,7 @@ bool GameloopEndScreen()
 }
 
 // Resets Everything On Screen To Start Game Again 
-void HandleGameReset()
+void ResetGameScreen()
 {
     // Player Reference 
     GameObject& obj_agent8 = Play::GetGameObjectByType(TYPE_AGENT8);
@@ -731,14 +754,157 @@ void HandleGameReset()
     obj_agent8.pos = { 115, 600 };
     obj_agent8.velocity = { 0, 0 };
     obj_agent8.frame = 0;
-    Play::StartAudioLoop("music");
+
+    // Turn Off Music When Dead
+    if (!gameState.isMusicOn)
+    {
+        Play::StartAudioLoop("music");
+    }
+
+    // Reset Score
     gameState.score = 0;
 
     // Destoryed all Coins and Tools 
     for (int id_obj : Play::CollectGameObjectIDsByType(TYPE_TOOL))
+    {
         Play::GetGameObject(id_obj).type = TYPE_DESTROYED;
+    }
+       
 
     for (int id_obj : Play::CollectGameObjectIDsByType(TYPE_COIN))
+    {
         Play::GetGameObject(id_obj).type = TYPE_DESTROYED;
+    }
+        
 }
 
+// Set Up Leaderboard From Previous Games 
+void SetUpLeaderBoard()
+{
+    std::vector<int> entireLeaderBoard(10);
+
+    std::ifstream LeaderboardRead("Leaderboard.txt");
+
+    int scoreFromLeaderboard = 0; 
+
+    if (LeaderboardRead.is_open())
+    {
+        while (LeaderboardRead >> scoreFromLeaderboard)
+        {
+            gameState.leaderboardTopScore.push_back(scoreFromLeaderboard);
+        }
+        LeaderboardRead.close();
+    }
+    std::sort(gameState.leaderboardTopScore.begin(), gameState.leaderboardTopScore.end(), std::greater<>());
+}
+
+bool GameloopLeaderBoard()
+{
+    // Black Background
+    Play::ClearDrawingBuffer(Play::cBlack);
+
+
+    Play::DrawFontText("64px", "Leaderboard Top 8",
+        { DISPLAY_WIDTH / 2 - 400, DISPLAY_HEIGHT / 10 * 9 }, Play::CENTRE);
+
+    // Adds The Correct Amount Of Missing Numbers TO Prevent Crashing
+    if (gameState.leaderboardTopScore.size() < 8 )
+    {
+        gameState.leaderboardTopScore.resize(gameState.leaderboardTopScore.size() + 8 - gameState.leaderboardTopScore.size(), 0);
+    }
+    // Top 8 Scores
+    for (int i = 0; i < 8; i++)
+    {
+        Play::DrawFontText("32px", std::to_string(i + 1) + ". " + std::to_string(gameState.leaderboardTopScore[i]),
+            { DISPLAY_WIDTH / 2 - 400, DISPLAY_HEIGHT / 10 * (8 - i)}, Play::CENTRE);
+    }
+
+    Play::DrawFontText("32px", "Menu",
+        { DISPLAY_WIDTH / 2 + 400, DISPLAY_HEIGHT / 4 * 3}, Play::CENTRE);
+    Play::DrawFontText("32px", "Reset Leaderboard",
+        { DISPLAY_WIDTH / 2 + 400, DISPLAY_HEIGHT / 4 * 2 }, Play::CENTRE);
+    Play::DrawFontText("32px", "Quit",
+        { DISPLAY_WIDTH / 2 + 400, DISPLAY_HEIGHT / 4 }, Play::CENTRE);
+
+    // Input For Choosing Option 
+    if (Play::KeyPressed(Play::KEY_DOWN) && gameState.playerLeaderboardChoice < 3)
+    {
+        gameState.playerLeaderboardChoice++;
+    }
+    else if (Play::KeyPressed(Play::KEY_UP) && gameState.playerLeaderboardChoice > 1)
+    {
+        gameState.playerLeaderboardChoice--;
+    }
+
+    // Results for Chooing Option 
+    switch (gameState.playerLeaderboardChoice) {
+        case 1:
+        {
+            // Menu 
+            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 + 200, DISPLAY_HEIGHT / 4 * 3 }, 0);
+
+            if (Play::KeyPressed(Play::KEY_ENTER))
+            {
+                ResetGameScreen();
+                gameState.gameScreen = MAIN_MENU;
+
+            }
+            break;
+        }
+
+        case 2:
+        {
+            // Reset Leaderboard 
+            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 + 200, DISPLAY_HEIGHT / 4 * 2 }, 0);
+
+            if (Play::KeyPressed(Play::KEY_ENTER))
+            {
+                gameState.leaderboardTopScore.assign(8, 0);
+                std::ofstream LeaderboardFile("Leaderboard.txt", std::ios::trunc);
+            }
+
+            break;
+        }
+
+        case 3:
+        {
+            // Quit
+            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 + 200, DISPLAY_HEIGHT / 4}, 0);
+            if (Play::KeyPressed(Play::KEY_ENTER))
+            {
+                return true;
+            }
+            break;
+        }
+        default:
+        {
+            // Ends Game If There Is A Bug In Menu
+            return true;
+        }
+    }
+
+    // Updates Text 
+    Play::PresentDrawingBuffer();
+
+    return false;
+}
+
+// Updates New Score 
+void UploadScore()
+{
+
+    // Upload To File For Future Games 
+    std::ofstream LeaderboardWrite("Leaderboard.txt", std::ios::app);
+    if (LeaderboardWrite.is_open()) {
+
+        LeaderboardWrite << std::endl << gameState.score;
+
+        LeaderboardWrite.close();
+    }
+    std::ifstream LeaderboardRead("Leaderboard.txt");
+
+    // In Game Upload
+    gameState.leaderboardTopScore.push_back(gameState.score);
+    std::sort(gameState.leaderboardTopScore.begin(), gameState.leaderboardTopScore.end(), std::greater<>());
+
+}
