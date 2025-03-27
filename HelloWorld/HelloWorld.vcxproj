@@ -203,13 +203,14 @@
     <Image Include="Data\Sprites\agent8_hang_2.png" />
     <Image Include="Data\Sprites\coin.png" />
     <Image Include="Data\Sprites\coins_2.png" />
+    <Image Include="Data\Sprites\coin_power_4x3.png" />
     <Image Include="Data\Sprites\driver.png" />
     <Image Include="Data\Sprites\fan_3.png" />
     <Image Include="Data\Sprites\font32px_10x10.png" />
     <Image Include="Data\Sprites\font64px_10x10.png" />
     <Image Include="Data\Sprites\font72px_10x10.png" />
     <Image Include="Data\Sprites\laser_2.png" />
-    <Image Include="Data\Sprites\aa_playbuffer_title.png" />
+    <Image Include="Data\Sprites\playbuffer_title.png" />
     <Image Include="Data\Sprites\spanner.png" />
     <Image Include="Data\Sprites\star.png" />
   </ItemGroup>

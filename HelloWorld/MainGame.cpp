@@ -44,6 +44,12 @@ struct GameState
 
     bool isMusicOn = true; 
 
+    bool isCoinFrenzy = false; 
+    float coinFrenzyTimer = 0.0f; 
+
+    float scoreMultiplier = 1;
+    int toolAttackStreak = 0; 
+
     //Leaderboard Information 
     std::vector<int> leaderboardTopScore;
 
@@ -63,6 +69,7 @@ enum GameObjectType
     TYPE_FAN,
     TYPE_TOOL,
     TYPE_COIN,
+    TYPE_COIN_POWER,
     TYPE_STAR,
     TYPE_LASER,
     TYPE_DESTROYED,
@@ -76,14 +83,18 @@ void UpdateCoinsAndStars();
 void UpdateLasers();
 void UpdateDestroyed();
 void UpdateAgent8();
-void GameloopSplashScreen(float elapsedTime);
+
+void GameloopSplashScreen();
 bool GameloopMainMenu();
-void GameloopGameScene();
+void GameloopGameScene(float elapsedTime);
 bool GameloopEndScreen();
 void ResetGameScreen();
+
 void SetUpLeaderBoard();
 void UploadScore();
 bool GameloopLeaderBoard();
+
+void UpdateCoinPower();
 
 // Entry Point 
 void MainGameEntry(PLAY_IGNORE_COMMAND_LINE)
@@ -104,12 +115,14 @@ void MainGameEntry(PLAY_IGNORE_COMMAND_LINE)
 // Updates Game Every 60 Times Per Second 
 bool MainGameUpdate(float elapsedTime)
 {
+    gameState.timer += elapsedTime;
+
     // Gameloop: Switch To Different Menus And Screens 
     switch (gameState.gameScreen)
     {
         case SLPASH_SCREEN:
         {
-            GameloopSplashScreen(elapsedTime);
+            GameloopSplashScreen();
             break;
         }
 
@@ -121,7 +134,7 @@ bool MainGameUpdate(float elapsedTime)
 
         case GAME_SCENE:
         {
-            GameloopGameScene();
+            GameloopGameScene(elapsedTime);
             break;
         }
 
@@ -223,7 +236,7 @@ void UpdateFan()
     GameObject& obj_fan = Play::GetGameObjectByType(TYPE_FAN);
 
     // 1/50 Chance Of Spawning A Driver 
-    if (Play::RandomRoll(50) == 50)
+    if (Play::RandomRoll(50) == 50 && !gameState.isCoinFrenzy)
     {
         // Set Driver Objects And Its Movement 
         int id = Play::CreateGameObject(TYPE_TOOL, obj_fan.pos, 50, "driver");
@@ -242,14 +255,31 @@ void UpdateFan()
         Play::PlayAudio("tool");
     }
 
-    // 1/150 Chance Of Spawning Coin 
-    if (Play::RandomRoll(150) == 1)
+    // 1/150 Chance Of Spawning Coin and 1/50 if Coin Frenzy Is On 
+    int coinChance = 150; 
+
+    if (gameState.isCoinFrenzy)
     {
-        // Sets Coin Sprite And Animation and Movement 
-        int id = Play::CreateGameObject(TYPE_COIN, obj_fan.pos, 40, "coin");
-        GameObject& obj_coin = Play::GetGameObject(id);
-        obj_coin.velocity = { -3, 0 };
-        obj_coin.rotSpeed = 0.1f;
+        coinChance = 20;
+    }
+
+    if (Play::RandomRoll(coinChance) == 1)
+    {
+        
+        if (Play::RandomRoll(5) == 1 && !gameState.isCoinFrenzy)
+        {
+            int id = Play::CreateGameObject(TYPE_COIN_POWER, obj_fan.pos, 25, "coin_power");
+            GameObject& obj_coin = Play::GetGameObject(id);
+            obj_coin.velocity = { -3, 0 };
+        }
+        else
+        {
+            // Sets Coin Sprite And Animation and Movement 
+            int id = Play::CreateGameObject(TYPE_COIN, obj_fan.pos, 40, "coin");
+            GameObject& obj_coin = Play::GetGameObject(id);
+            obj_coin.velocity = { -3, 0 };
+            obj_coin.rotSpeed = 0.1f;
+        }
     }
 
     // Constantly Updates Fan 
@@ -371,6 +401,47 @@ void UpdateCoinsAndStars()
     }
 }
 
+void UpdateCoinPower()
+{
+    // Player Reference and Coin Vector 
+    GameObject& obj_agent8 = Play::GetGameObjectByType(TYPE_AGENT8);
+    std::vector<int> vCoinPowers = Play::CollectGameObjectIDsByType(TYPE_COIN_POWER);
+
+    // Looks Over Each Coin In Vector 
+    for (int id_coin : vCoinPowers)
+    {
+        // Reference For Coin Object 
+        GameObject& obj_coin = Play::GetGameObject(id_coin);
+        bool hasCollided = false;
+
+        // If Player Has Collided With Coin Power Up 
+        if (Play::IsColliding(obj_coin, obj_agent8))
+        {
+            // More Points and Turn Frency On And Reset Timer
+            hasCollided = true;
+            gameState.score += 1000;
+            gameState.isCoinFrenzy = true;
+            gameState.coinFrenzyTimer = 0.0f;
+   
+            Play::PlayAudio("collect");
+        }
+
+        // Updates Coin Power Up 
+ 
+        Play::UpdateGameObject(obj_coin);
+
+        // Rotate Coin Power Up 
+        int frame = gameState.timer * 11; 
+        Play::DrawSprite("coin_power", obj_coin.pos, frame % 11);
+ 
+        // If Coin Has Been Hit Or Collided Then Desttory It 
+        if (!Play::IsVisible(obj_coin) || hasCollided)
+        {
+            Play::DestroyGameObject(id_coin);
+        }
+    }
+}
+
 // Updates Lasers Spawned 
 void UpdateLasers()
 {
@@ -378,6 +449,7 @@ void UpdateLasers()
     std::vector<int> vLasers = Play::CollectGameObjectIDsByType(TYPE_LASER);
     std::vector<int> vTools = Play::CollectGameObjectIDsByType(TYPE_TOOL);
     std::vector<int> vCoins = Play::CollectGameObjectIDsByType(TYPE_COIN);
+    std::vector<int> vCoinPowers = Play::CollectGameObjectIDsByType(TYPE_COIN_POWER);
 
     // Checks Every Lazer In Vector
     for (int id_laser : vLasers)
@@ -413,6 +485,20 @@ void UpdateLasers()
                 obj_coin.type = TYPE_DESTROYED;
                 Play::PlayAudio("error");
                 gameState.score -= 300;
+            }
+        }
+
+        for (int id_coin_power : vCoinPowers)
+        {
+            // Each Coin 
+            GameObject& obj_coin_power = Play::GetGameObject(id_coin_power);
+            // Checks If Lazer Hits Coin 
+            if (Play::IsColliding(obj_laser, obj_coin_power))
+            {
+                // Changes Type Of Coin To Destroyed And Decreases Score 
+                hasCollided = true;
+                obj_coin_power.type = TYPE_DESTROYED;
+                Play::PlayAudio("error");
             }
         }
 
@@ -531,12 +617,21 @@ void UpdateAgent8()
 }
 
 // Gameloop For Slpash Screen 
-void GameloopSplashScreen(float elapsedTime)
+void GameloopSplashScreen()
 {
-    gameState.timer += elapsedTime;
+    
 
     Play::ClearDrawingBuffer(Play::cBlack);
-    Play::DrawSprite(0, { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 }, gameState.timer);
+    Play::DrawSprite("playbuffer_title", {DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2}, 0);
+   
+
+
+    int frame = gameState.timer * 12; 
+    
+    Play::DrawSprite("coin_power", { DISPLAY_WIDTH / 3, DISPLAY_HEIGHT / 3 }, frame % 11);
+   
+ 
+
     // Updates Text 
     Play::PresentDrawingBuffer();
 
@@ -549,6 +644,7 @@ void GameloopSplashScreen(float elapsedTime)
 // Gameloop For Main Menu 
 bool GameloopMainMenu()
 {
+
     // Black Background
     Play::ClearDrawingBuffer(Play::cBlack);
 
@@ -569,6 +665,7 @@ bool GameloopMainMenu()
         { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 6 }, Play::CENTRE);
 
     
+
     // Input For Choosing Option 
     if (Play::KeyPressed(Play::KEY_DOWN) && gameState.playerMenuChoice < 3)
     {
@@ -584,7 +681,7 @@ bool GameloopMainMenu()
         case 1:
         {
             // Play 
-            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 6 * 4 }, 0);
+            Play::DrawSprite("laser", {DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 6 * 4}, 0);
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
                 gameState.gameScreen = GAME_SCENE;
@@ -594,7 +691,7 @@ bool GameloopMainMenu()
         case 2:
         {
             // Leaderboard 
-            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 6 * 3 }, 0);
+            Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 6 * 3 }, 0);
 
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
@@ -606,7 +703,7 @@ bool GameloopMainMenu()
         case 3:
         {
             // Quit
-            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 6 * 2 }, 0);
+            Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 6 * 2 }, 0);
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
                 return true; 
@@ -626,13 +723,14 @@ bool GameloopMainMenu()
 }
 
 // Gameloop For Game Itself 
-void GameloopGameScene()
+void GameloopGameScene(float elapsedTime)
 {
     Play::DrawBackground();
     UpdateAgent8();
     UpdateFan();
     UpdateTools();
     UpdateCoinsAndStars();
+    UpdateCoinPower();
     UpdateLasers();
     UpdateDestroyed();
     Play::DrawFontText("32px", "ARROW KEYS TO MOVE UP AND DOWN AND SPACE TO FIRE",
@@ -641,6 +739,21 @@ void GameloopGameScene()
         { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT - 80 }, Play::CENTRE);
     Play::DrawFontText("32px", std::to_string(gameState.timer),
         { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 }, Play::CENTRE);
+
+    // Display and Turn Off Coin Frenzy After 10 
+    if (gameState.isCoinFrenzy)
+    {
+        Play::DrawFontText("32px", "Coin Frenzy: " + std::to_string(gameState.coinFrenzyTimer),
+            { DISPLAY_WIDTH / 6, DISPLAY_HEIGHT - 80 }, Play::CENTRE);
+
+
+        gameState.coinFrenzyTimer += elapsedTime;
+
+        if (gameState.coinFrenzyTimer > 5)
+        {
+            gameState.isCoinFrenzy = false;
+        }
+    }
 
     // Updates Text 
     Play::PresentDrawingBuffer();
@@ -683,7 +796,7 @@ bool GameloopEndScreen()
         case 1:
         {
             // Retry 
-            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 8 * 5 }, 0);
+            Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 8 * 5 }, 0);
 
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
@@ -695,7 +808,7 @@ bool GameloopEndScreen()
         case 2:
         {
             // Leaderboard 
-            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 8 * 4 }, 0);
+            Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 8 * 4 }, 0);
 
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
@@ -707,7 +820,7 @@ bool GameloopEndScreen()
         case 3:
         {
             // Menu 
-            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 8 * 3 }, 0);
+            Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 8 * 3 }, 0);
 
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
@@ -720,7 +833,7 @@ bool GameloopEndScreen()
         case 4:
         {
             // Quit 
-            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 8 * 2 }, 0);
+            Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 8 * 2 }, 0);
 
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
@@ -841,7 +954,7 @@ bool GameloopLeaderBoard()
         case 1:
         {
             // Menu 
-            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 + 200, DISPLAY_HEIGHT / 4 * 3 }, 0);
+            Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 + 200, DISPLAY_HEIGHT / 4 * 3 }, 0);
 
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
@@ -855,7 +968,7 @@ bool GameloopLeaderBoard()
         case 2:
         {
             // Reset Leaderboard 
-            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 + 200, DISPLAY_HEIGHT / 4 * 2 }, 0);
+            Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 + 200, DISPLAY_HEIGHT / 4 * 2 }, 0);
 
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
@@ -869,7 +982,7 @@ bool GameloopLeaderBoard()
         case 3:
         {
             // Quit
-            Play::DrawSprite(12, { DISPLAY_WIDTH / 2 + 200, DISPLAY_HEIGHT / 4}, 0);
+            Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 + 200, DISPLAY_HEIGHT / 4}, 0);
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
                 return true;
@@ -906,5 +1019,4 @@ void UploadScore()
     // In Game Upload
     gameState.leaderboardTopScore.push_back(gameState.score);
     std::sort(gameState.leaderboardTopScore.begin(), gameState.leaderboardTopScore.end(), std::greater<>());
-
 }

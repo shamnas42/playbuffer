@@ -76,9 +76,10 @@
     <Image Include="Data\Backgrounds\background.png">
       <Filter>Resource\Backgrounds</Filter>
     </Image>
-    <Image Include="Data\Sprites\aa_playbuffer_title.png">
+    <Image Include="Data\Sprites\playbuffer_title.png">
       <Filter>Resource\Sprites</Filter>
     </Image>
+    <Image Include="Data\Sprites\coin_power_4x3.png" />
   </ItemGroup>
   <ItemGroup>
     <Media Include="Data\Audio\snd_collect.wav">
