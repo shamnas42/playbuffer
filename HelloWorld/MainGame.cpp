@@ -28,6 +28,14 @@ enum GameloopScreen
     END_SCREEN,
 };
 
+struct MenuDisplay
+{
+    const char* fontSize = "32px";
+    const std::string menuContent = "Not Set";
+    const int menuXLocation = 0;
+    const int menuYLocation = 0;
+};
+
 // Game Information 
 struct GameState
 {
@@ -37,18 +45,22 @@ struct GameState
     // Score For Game 
     int score{ 0 };
 
+    // Coin Frenzy Mode 
+    float coinFrenzyTimer = 0.0f;
+    bool isCoinFrenzy = false;
+
+    // Score Multiplier 
+    float scoreMultiplier = 1;
+    int toolAttackStreak = 0;
+
     // Menu Choices 
+    bool bShouldSoundBeOn = true;
+    bool isMusicOn = true; 
+
+    // Menu Choices
     int playerMenuChoice = 1;
     int playerLeaderboardChoice = 1;
     int playerEndScreenChoice = 1;
-
-    bool isMusicOn = true; 
-
-    bool isCoinFrenzy = false; 
-    float coinFrenzyTimer = 0.0f; 
-
-    float scoreMultiplier = 1;
-    int toolAttackStreak = 0; 
 
     //Leaderboard Information 
     std::vector<int> leaderboardTopScore;
@@ -80,30 +92,38 @@ void HandlePlayerControls();
 void UpdateFan();
 void UpdateTools();
 void UpdateCoinsAndStars();
+void UpdateCoinPower();
 void UpdateLasers();
 void UpdateDestroyed();
 void UpdateAgent8();
-
+void PrintMenu(const char* textSize, const std::string textContent, const int textLocationX, const int textLocationY);
 void GameloopSplashScreen();
-bool GameloopMainMenu();
-void GameloopGameScene(float elapsedTime);
-bool GameloopEndScreen();
+void DisplayMainMenu();
+bool ChooseMainMenu();
+void GameloopGameScene(const float elapsedTime);
 void ResetGameScreen();
-
+void DisplayEndScreen();
+bool ChooseEndScreen();
+void DisplayLeaderBoardMenu();
+void DisplayLeaderBoardScores();
+bool ChooseLeaderBoard();
 void SetUpLeaderBoard();
 void UploadScore();
-bool GameloopLeaderBoard();
-
-void UpdateCoinPower();
+void SetUpSound();
+void UpdateSound();
 
 // Entry Point 
-void MainGameEntry(PLAY_IGNORE_COMMAND_LINE)
+void MainGameEntry(PLAY_IGNORE_COMMAND_LINE) 
 {
     // Sets Up Intial State of Game 
     Play::CreateManager(DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_SCALE);
     Play::CentreAllSpriteOrigins();
     Play::LoadBackground("Data\\Backgrounds\\background.png");
-    Play::StartAudioLoop("music");
+    SetUpSound();
+    if (gameState.bShouldSoundBeOn)
+    {
+        Play::StartAudioLoop("music");
+    }
     Play::CreateGameObject(TYPE_AGENT8, { 115, 600 }, 50, "agent8");
     int id_fan = Play::CreateGameObject(TYPE_FAN, { 1140, 503 }, 0, "fan");
     Play::GetGameObject(id_fan).velocity = { 0, -3 };
@@ -125,31 +145,30 @@ bool MainGameUpdate(float elapsedTime)
             GameloopSplashScreen();
             break;
         }
-
         case MAIN_MENU:
         {
-            return GameloopMainMenu();
+            DisplayMainMenu();
+            return ChooseMainMenu();
             break;
         }
-
         case GAME_SCENE:
         {
             GameloopGameScene(elapsedTime);
             break;
         }
-
         case LEADERBOARD:
         {
-            return GameloopLeaderBoard();
+            DisplayLeaderBoardMenu();
+            DisplayLeaderBoardScores();
+            return ChooseLeaderBoard();
             break;
         }
-
         case END_SCREEN:
         {
-            return GameloopEndScreen();
+            DisplayEndScreen();
+            return ChooseEndScreen();
             break;
         }
-
         default:
         {
             // Ends Game If There Is A Bug In Menu
@@ -169,7 +188,7 @@ int MainGameExit(void)
 }
 
 // Controls Animations and Movement Of Player 
-void HandlePlayerControls()
+void HandlePlayerControls() 
 {
     // Player Reference 
     GameObject& obj_agent8 = Play::GetGameObjectByType(TYPE_AGENT8);
@@ -212,7 +231,10 @@ void HandlePlayerControls()
         Vector2D firePos = obj_agent8.pos + Vector2D(155, 75);
         int id = Play::CreateGameObject(TYPE_LASER, firePos, 30, "laser");
         Play::GetGameObject(id).velocity = { 32, 0 };
-        Play::PlayAudio("shoot");
+        if (gameState.bShouldSoundBeOn)
+        {
+            Play::PlayAudio("shoot");
+        }
     }
 
     // Updates Player 
@@ -252,7 +274,10 @@ void UpdateFan()
             obj_tool.velocity.x = -4;
             obj_tool.rotSpeed = 0.1f;
         }
-        Play::PlayAudio("tool");
+        if (gameState.bShouldSoundBeOn)
+        {
+            Play::PlayAudio("tool");
+        }
     }
 
     // 1/150 Chance Of Spawning Coin and 1/50 if Coin Frenzy Is On 
@@ -313,10 +338,13 @@ void UpdateTools()
         if (gameState.agentState != STATE_DEAD && Play::IsColliding(obj_tool, obj_agent8))
         {
             // Changes Players State To Dead After Getting Hit 
-            Play::StopAudio("music");
-            Play::PlayAudio("die");
+            if (gameState.bShouldSoundBeOn)
+            {
+                Play::StopAudio("music");
+                Play::PlayAudio("die");
+                gameState.isMusicOn = false; 
+            }
             gameState.agentState = STATE_DEAD;
-            gameState.isMusicOn = false;
         }
         Play::UpdateGameObject(obj_tool);
 
@@ -364,9 +392,11 @@ void UpdateCoinsAndStars()
             }
 
             hasCollided = true;
-            gameState.score += 500;
-
-            Play::PlayAudio("collect");
+            gameState.score += (int)(500 * gameState.scoreMultiplier);
+            if (gameState.bShouldSoundBeOn)
+            {
+                Play::PlayAudio("collect");
+            }
         }
 
         // Updates Coins And Its Animation 
@@ -419,19 +449,20 @@ void UpdateCoinPower()
         {
             // More Points and Turn Frency On And Reset Timer
             hasCollided = true;
-            gameState.score += 1000;
+            gameState.score += (int)(1000 * gameState.scoreMultiplier);
             gameState.isCoinFrenzy = true;
             gameState.coinFrenzyTimer = 0.0f;
-   
-            Play::PlayAudio("collect");
+            if (gameState.bShouldSoundBeOn)
+            {
+                Play::PlayAudio("collect");
+            }
         }
 
         // Updates Coin Power Up 
- 
         Play::UpdateGameObject(obj_coin);
 
         // Rotate Coin Power Up 
-        int frame = gameState.timer * 11; 
+        int frame = (int)gameState.timer * 11; 
         Play::DrawSprite("coin_power", obj_coin.pos, frame % 11);
  
         // If Coin Has Been Hit Or Collided Then Desttory It 
@@ -468,7 +499,14 @@ void UpdateLasers()
                 // Changes Type Of Tool To Destroyed And Increases Score 
                 hasCollided = true;
                 obj_tool.type = TYPE_DESTROYED;
-                gameState.score += 100;
+                gameState.score += (int)(100 * gameState.scoreMultiplier);
+                gameState.toolAttackStreak++; 
+
+                // Increase Score Multiplier For Every 5 Attacks
+                if (gameState.toolAttackStreak % 5 == 0)
+                {
+                    gameState.scoreMultiplier += .5;
+                }
             }
         }
 
@@ -483,8 +521,15 @@ void UpdateLasers()
                 // Changes Type Of Coin To Destroyed And Decreases Score 
                 hasCollided = true;
                 obj_coin.type = TYPE_DESTROYED;
-                Play::PlayAudio("error");
+                if (gameState.bShouldSoundBeOn)
+                {
+                    Play::PlayAudio("error");
+                }
                 gameState.score -= 300;
+
+                // Resets Streak 
+                gameState.toolAttackStreak = 0;
+                gameState.scoreMultiplier = 1;
             }
         }
 
@@ -498,7 +543,15 @@ void UpdateLasers()
                 // Changes Type Of Coin To Destroyed And Decreases Score 
                 hasCollided = true;
                 obj_coin_power.type = TYPE_DESTROYED;
-                Play::PlayAudio("error");
+                if (gameState.bShouldSoundBeOn)
+                {
+                    Play::PlayAudio("error");
+                }
+                gameState.score -= 1000;
+
+                // Resets Streak 
+                gameState.toolAttackStreak = 0;
+                gameState.scoreMultiplier = 1;
             }
         }
 
@@ -566,7 +619,6 @@ void UpdateAgent8()
             }
             break;
         }
-
         case STATE_HALT:
         {
             // Player Stopping 
@@ -577,16 +629,12 @@ void UpdateAgent8()
             }
             break;
         }
-
         case STATE_PLAY:
         {
-
-
             // During Play, Looks for Player Input 
             HandlePlayerControls();
             break;
         }
-
         case STATE_DEAD:
         {
             // Animation When Getting Hit 
@@ -596,6 +644,7 @@ void UpdateAgent8()
             // Goes To End Screen When Dead 
             gameState.gameScreen = END_SCREEN;
 
+            // Updates Score
             UploadScore();
 
             break;
@@ -616,58 +665,72 @@ void UpdateAgent8()
     Play::DrawObjectRotated(obj_agent8);
 }
 
+// Prints Each Menu Display 
+void PrintMenu(const char* textSize, const std::string textContent, const int textLocationX, const int textLocationY)
+{
+    Play::DrawFontText(textSize, textContent, { textLocationX, textLocationY }, Play::CENTRE);
+}
+
 // Gameloop For Slpash Screen 
 void GameloopSplashScreen()
 {
-    
-
+    // Look Of Splash Screen 
     Play::ClearDrawingBuffer(Play::cBlack);
-    Play::DrawSprite("playbuffer_title", {DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2}, 0);
-   
-
-
-    int frame = gameState.timer * 12; 
-    
-    Play::DrawSprite("coin_power", { DISPLAY_WIDTH / 3, DISPLAY_HEIGHT / 3 }, frame % 11);
-   
- 
-
-    // Updates Text 
+    Play::DrawSprite("playbuffer_title", {DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2}, 0); 
     Play::PresentDrawingBuffer();
 
+    // 4 Seconds In Slpash Screen
     if (gameState.timer > 4)
     {
         gameState.gameScreen = MAIN_MENU;
     }
 }
 
-// Gameloop For Main Menu 
-bool GameloopMainMenu()
+void DisplayMainMenu()
 {
-
-    // Black Background
     Play::ClearDrawingBuffer(Play::cBlack);
 
-    // Menu Options 
-    Play::DrawFontText("72px", "Menu",
-        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 6 * 5 }, Play::CENTRE);
-    
-    Play::DrawFontText("64px", "Play",
-        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 6 * 4 }, Play::CENTRE);
+    const int menuOptionNumber = 6;
+    const int menuX = DISPLAY_WIDTH / 2;
+    const int menuY = DISPLAY_HEIGHT / 7;
 
-    Play::DrawFontText("64px", "Leaderboard",
-        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 6 * 3 }, Play::CENTRE);
+    MenuDisplay mainMenuDisplayArray[menuOptionNumber] =
+    {
+        {"72px", "Menu", menuX, menuY},
+        {"64px", "Play", menuX, menuY},
+        {"64px", "Leaderboard", menuX, menuY},
+        {"64px", "Turn Sound ", menuX, menuY},
+        {"64px", "Quit", menuX, menuY},
+        {"32px", "Press Enter To Select", menuX, menuY}
+    };
 
-    Play::DrawFontText("64px", "Quit",
-        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 6 * 2 }, Play::CENTRE);
+    for (int i = 0; i < menuOptionNumber; i++)
+    {
 
-    Play::DrawFontText("32px", "Press Enter To Select",
-        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 6 }, Play::CENTRE);
+        if (i != 3)
+        {
+            PrintMenu(mainMenuDisplayArray[i].fontSize, mainMenuDisplayArray[i].menuContent, mainMenuDisplayArray[i].menuXLocation, mainMenuDisplayArray[i].menuYLocation * (menuOptionNumber - i));
+        }
+        else
+        {
+            if (gameState.bShouldSoundBeOn)
+            {
+                PrintMenu(mainMenuDisplayArray[i].fontSize, mainMenuDisplayArray[i].menuContent + "Off", mainMenuDisplayArray[i].menuXLocation, mainMenuDisplayArray[i].menuYLocation * (menuOptionNumber - i));
+            }
+            else
+            {
+                PrintMenu(mainMenuDisplayArray[i].fontSize, mainMenuDisplayArray[i].menuContent + "On", mainMenuDisplayArray[i].menuXLocation, mainMenuDisplayArray[i].menuYLocation * (menuOptionNumber - i));
+            }
+        }
+    }
+}
 
-    
+// Gameloop For Main Menu 
+bool ChooseMainMenu()
+{
 
     // Input For Choosing Option 
-    if (Play::KeyPressed(Play::KEY_DOWN) && gameState.playerMenuChoice < 3)
+    if (Play::KeyPressed(Play::KEY_DOWN) && gameState.playerMenuChoice < 4)
     {
         gameState.playerMenuChoice++;
     }
@@ -676,12 +739,15 @@ bool GameloopMainMenu()
         gameState.playerMenuChoice--;
     }
 
+    // Lazer Pointer 
+    Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 - 300, DISPLAY_HEIGHT / 7 * (6 - gameState.playerMenuChoice)}, 0);
+
     // Results for Chooing Option 
-    switch (gameState.playerMenuChoice) {
+    switch (gameState.playerMenuChoice) 
+    {
         case 1:
         {
             // Play 
-            Play::DrawSprite("laser", {DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 6 * 4}, 0);
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
                 gameState.gameScreen = GAME_SCENE;
@@ -691,22 +757,39 @@ bool GameloopMainMenu()
         case 2:
         {
             // Leaderboard 
-            Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 6 * 3 }, 0);
-
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
                 gameState.gameScreen = LEADERBOARD;
             }
-
             break;
         }
         case 3:
         {
-            // Quit
-            Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 6 * 2 }, 0);
+            // Music 
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
-                return true; 
+                if (gameState.bShouldSoundBeOn)
+                {
+                    Play::StopAudio("music");
+                    gameState.bShouldSoundBeOn = false;
+                    gameState.isMusicOn = false; 
+                }
+                else
+                {
+                    gameState.bShouldSoundBeOn = true;
+                    Play::StartAudioLoop("music");
+                    gameState.isMusicOn = true;
+                }
+                UpdateSound();
+            }
+            break;
+        }
+        case 4:
+        {
+            // Quit
+            if (Play::KeyPressed(Play::KEY_ENTER))
+            {
+                return true;
             }
             break;
         }
@@ -723,7 +806,7 @@ bool GameloopMainMenu()
 }
 
 // Gameloop For Game Itself 
-void GameloopGameScene(float elapsedTime)
+void GameloopGameScene(const float elapsedTime)
 {
     Play::DrawBackground();
     UpdateAgent8();
@@ -737,18 +820,13 @@ void GameloopGameScene(float elapsedTime)
         { DISPLAY_WIDTH / 2, 40 }, Play::CENTRE);
     Play::DrawFontText("72px", "SCORE: " + std::to_string(gameState.score),
         { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT - 80 }, Play::CENTRE);
-    Play::DrawFontText("32px", std::to_string(gameState.timer),
-        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 }, Play::CENTRE);
+    Play::DrawFontText("32px", "Multi: x" + std::to_string(std::round(gameState.scoreMultiplier * 10.0f) / 10.0f),
+        { DISPLAY_WIDTH / 2 + 200, DISPLAY_HEIGHT - 80 }, Play::CENTRE);
 
     // Display and Turn Off Coin Frenzy After 10 
     if (gameState.isCoinFrenzy)
     {
-        Play::DrawFontText("32px", "Coin Frenzy: " + std::to_string(gameState.coinFrenzyTimer),
-            { DISPLAY_WIDTH / 6, DISPLAY_HEIGHT - 80 }, Play::CENTRE);
-
-
         gameState.coinFrenzyTimer += elapsedTime;
-
         if (gameState.coinFrenzyTimer > 5)
         {
             gameState.isCoinFrenzy = false;
@@ -759,28 +837,81 @@ void GameloopGameScene(float elapsedTime)
     Play::PresentDrawingBuffer();
 }
 
-// Gameloop For End Screen
-bool GameloopEndScreen()
+// Resets Everything On Screen To Start Game Again 
+void ResetGameScreen()
 {
-    // Black Background
+    // Player Reference 
+    GameObject& obj_agent8 = Play::GetGameObjectByType(TYPE_AGENT8);
+
+    // Sets Player's States For Beginning 
+    gameState.agentState = STATE_APPEAR;
+
+    // Set Players Settings
+    obj_agent8.pos = { 115, 600 };
+    obj_agent8.velocity = { 0, 0 };
+    obj_agent8.frame = 0;
+
+    // Turn On Music When Reset
+    if (gameState.bShouldSoundBeOn && !gameState.isMusicOn)
+    {
+        Play::StartAudioLoop("music");
+    }
+
+    // Reset Score, Muliplier, Streak, Coin Frenzy 
+    gameState.score = 0;
+    gameState.isCoinFrenzy = false;
+    gameState.scoreMultiplier = 1;
+    gameState.toolAttackStreak = 0;
+
+    // Destoryed all Coins, Coin Power Ups, and Tools 
+    for (int id_obj : Play::CollectGameObjectIDsByType(TYPE_TOOL))
+    {
+        Play::GetGameObject(id_obj).type = TYPE_DESTROYED;
+    }
+
+    for (int id_obj : Play::CollectGameObjectIDsByType(TYPE_COIN))
+    {
+        Play::GetGameObject(id_obj).type = TYPE_DESTROYED;
+    }
+
+    for (int id_obj : Play::CollectGameObjectIDsByType(TYPE_COIN_POWER))
+    {
+        Play::GetGameObject(id_obj).type = TYPE_DESTROYED;
+    }
+}
+
+
+void DisplayEndScreen()
+{
+    // Reset Screen 
     Play::ClearDrawingBuffer(Play::cBlack);
 
-    // Menu Options 
-    Play::DrawFontText("72px", "You Have Died",
-        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 8 * 7 }, Play::CENTRE);
-    Play::DrawFontText("64px", "Your Score Is: " + std::to_string(gameState.score),
-        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 8 * 6 }, Play::CENTRE);
-    Play::DrawFontText("64px", "Retry",
-        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 8 * 5 }, Play::CENTRE);
-    Play::DrawFontText("64px", "Leaderboard",
-        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 8 * 4 }, Play::CENTRE);
-    Play::DrawFontText("64px", "Menu",
-        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 8 * 3 }, Play::CENTRE);
-    Play::DrawFontText("64px", "Quit",
-        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 8 * 2 }, Play::CENTRE);
-    Play::DrawFontText("32px", "Press Enter To Select",
-        { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 8 }, Play::CENTRE);
+    // Menu Settings 
+    const int menuOptionNumber = 7;
+    const int menuX = DISPLAY_WIDTH / 2;
+    const int menuY = DISPLAY_HEIGHT / 8;
 
+    MenuDisplay endMenuDisplayArray[menuOptionNumber] =
+    {
+        {"72px", "You Have Died", menuX, menuY},
+        {"64px", "Your Score Is: " + std::to_string(gameState.score), menuX, menuY},
+        {"64px", "Retry", menuX, menuY},
+        {"64px", "Leaderboard", menuX, menuY},
+        {"64px", "Menu", menuX, menuY},
+        {"64px", "Quit", menuX, menuY},
+        {"32px", "Press Enter To Select", menuX, menuY}
+    };
+
+    // Shows Displays 
+    for (int i = 0; i < menuOptionNumber; i++)
+    {
+        PrintMenu(endMenuDisplayArray[i].fontSize, endMenuDisplayArray[i].menuContent, endMenuDisplayArray[i].menuXLocation, endMenuDisplayArray[i].menuYLocation * (menuOptionNumber - i));
+    }
+}
+
+// Gameloop For End Screen
+bool ChooseEndScreen()
+{
     // Input For Choosing Option 
     if (Play::KeyPressed(Play::KEY_DOWN) && gameState.playerEndScreenChoice < 4)
     {
@@ -791,13 +922,14 @@ bool GameloopEndScreen()
         gameState.playerEndScreenChoice--;
     }
 
+    // Lazer Pointer 
+    Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 8 * (6 - gameState.playerEndScreenChoice)}, 0);
+
     // Results for Chooing Option 
     switch (gameState.playerEndScreenChoice) {
         case 1:
         {
             // Retry 
-            Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 8 * 5 }, 0);
-
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
                 ResetGameScreen();
@@ -808,8 +940,6 @@ bool GameloopEndScreen()
         case 2:
         {
             // Leaderboard 
-            Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 8 * 4 }, 0);
-
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
                 gameState.gameScreen = LEADERBOARD;
@@ -820,21 +950,16 @@ bool GameloopEndScreen()
         case 3:
         {
             // Menu 
-            Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 8 * 3 }, 0);
-
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
                 ResetGameScreen();
                 gameState.gameScreen = MAIN_MENU;
-                
             }
             break;
         }
         case 4:
         {
             // Quit 
-            Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 - 200, DISPLAY_HEIGHT / 8 * 2 }, 0);
-
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
                 return true;
@@ -854,90 +979,57 @@ bool GameloopEndScreen()
     return false; 
 }
 
-// Resets Everything On Screen To Start Game Again 
-void ResetGameScreen()
+// Display Leaderboard Options 
+void DisplayLeaderBoardMenu()
 {
-    // Player Reference 
-    GameObject& obj_agent8 = Play::GetGameObjectByType(TYPE_AGENT8);
-
-    // Sets Player's States For Beginning 
-    gameState.agentState = STATE_APPEAR;
-
-    // Set Players Settings
-    obj_agent8.pos = { 115, 600 };
-    obj_agent8.velocity = { 0, 0 };
-    obj_agent8.frame = 0;
-
-    // Turn Off Music When Dead
-    if (!gameState.isMusicOn)
-    {
-        Play::StartAudioLoop("music");
-    }
-
-    // Reset Score
-    gameState.score = 0;
-
-    // Destoryed all Coins and Tools 
-    for (int id_obj : Play::CollectGameObjectIDsByType(TYPE_TOOL))
-    {
-        Play::GetGameObject(id_obj).type = TYPE_DESTROYED;
-    }
-       
-
-    for (int id_obj : Play::CollectGameObjectIDsByType(TYPE_COIN))
-    {
-        Play::GetGameObject(id_obj).type = TYPE_DESTROYED;
-    }
-        
-}
-
-// Set Up Leaderboard From Previous Games 
-void SetUpLeaderBoard()
-{
-    std::vector<int> entireLeaderBoard(10);
-
-    std::ifstream LeaderboardRead("Leaderboard.txt");
-
-    int scoreFromLeaderboard = 0; 
-
-    if (LeaderboardRead.is_open())
-    {
-        while (LeaderboardRead >> scoreFromLeaderboard)
-        {
-            gameState.leaderboardTopScore.push_back(scoreFromLeaderboard);
-        }
-        LeaderboardRead.close();
-    }
-    std::sort(gameState.leaderboardTopScore.begin(), gameState.leaderboardTopScore.end(), std::greater<>());
-}
-
-bool GameloopLeaderBoard()
-{
-    // Black Background
+    // Resets Screen
     Play::ClearDrawingBuffer(Play::cBlack);
 
+    // Settings for menu 
+    const int menuOptionNumber = 3;
+    const int menuX = DISPLAY_WIDTH / 2 + 400;
+    const int menuY = DISPLAY_HEIGHT / 4;
 
-    Play::DrawFontText("64px", "Leaderboard Top 8",
-        { DISPLAY_WIDTH / 2 - 400, DISPLAY_HEIGHT / 10 * 9 }, Play::CENTRE);
+    MenuDisplay leaderMenuDisplayArray[menuOptionNumber] =
+    {
+        {"32px", "Menu", menuX, menuY},
+        {"32px", "Reset Leaderboard", menuX, menuY},
+        {"32px", "Quit", menuX, menuY}
+    };
 
-    // Adds The Correct Amount Of Missing Numbers TO Prevent Crashing
-    if (gameState.leaderboardTopScore.size() < 8 )
+    // Print Each Setting Display 
+    for (int i = 0; i < menuOptionNumber; i++)
+    {
+        PrintMenu(leaderMenuDisplayArray[i].fontSize, leaderMenuDisplayArray[i].menuContent, leaderMenuDisplayArray[i].menuXLocation, leaderMenuDisplayArray[i].menuYLocation * (menuOptionNumber - i));
+    }
+}
+
+// Display Leaderboard scores 
+void DisplayLeaderBoardScores()
+{
+    const int scoreAmount = 8;
+    const int menuX = DISPLAY_WIDTH / 2 - 400;
+    const int menuY = DISPLAY_HEIGHT / 10;
+
+    // Title 
+    PrintMenu("64px", "Leaderboard Top 8", menuX, menuY * 9 );
+
+    // To Prevent Crash From Less Than 8 Scores 
+    if (gameState.leaderboardTopScore.size() < 8)
     {
         gameState.leaderboardTopScore.resize(gameState.leaderboardTopScore.size() + 8 - gameState.leaderboardTopScore.size(), 0);
     }
-    // Top 8 Scores
-    for (int i = 0; i < 8; i++)
-    {
-        Play::DrawFontText("32px", std::to_string(i + 1) + ". " + std::to_string(gameState.leaderboardTopScore[i]),
-            { DISPLAY_WIDTH / 2 - 400, DISPLAY_HEIGHT / 10 * (8 - i)}, Play::CENTRE);
-    }
 
-    Play::DrawFontText("32px", "Menu",
-        { DISPLAY_WIDTH / 2 + 400, DISPLAY_HEIGHT / 4 * 3}, Play::CENTRE);
-    Play::DrawFontText("32px", "Reset Leaderboard",
-        { DISPLAY_WIDTH / 2 + 400, DISPLAY_HEIGHT / 4 * 2 }, Play::CENTRE);
-    Play::DrawFontText("32px", "Quit",
-        { DISPLAY_WIDTH / 2 + 400, DISPLAY_HEIGHT / 4 }, Play::CENTRE);
+    // Score Display 
+    for (int i = 0; i < scoreAmount; i++)
+    {
+        PrintMenu("32px", std::to_string(i + 1) + ". " + std::to_string(gameState.leaderboardTopScore[i]), menuX, menuY * (scoreAmount - i));
+    }
+}
+
+// Chosing Leaderboard Scores 
+bool ChooseLeaderBoard()
+{
 
     // Input For Choosing Option 
     if (Play::KeyPressed(Play::KEY_DOWN) && gameState.playerLeaderboardChoice < 3)
@@ -949,13 +1041,14 @@ bool GameloopLeaderBoard()
         gameState.playerLeaderboardChoice--;
     }
 
+    // Lazer Pointer
+    Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 + 200, DISPLAY_HEIGHT / 4 * (4 - gameState.playerLeaderboardChoice)}, 0);
+
     // Results for Chooing Option 
     switch (gameState.playerLeaderboardChoice) {
         case 1:
         {
             // Menu 
-            Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 + 200, DISPLAY_HEIGHT / 4 * 3 }, 0);
-
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
                 ResetGameScreen();
@@ -964,25 +1057,19 @@ bool GameloopLeaderBoard()
             }
             break;
         }
-
         case 2:
         {
             // Reset Leaderboard 
-            Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 + 200, DISPLAY_HEIGHT / 4 * 2 }, 0);
-
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
                 gameState.leaderboardTopScore.assign(8, 0);
                 std::ofstream LeaderboardFile("Leaderboard.txt", std::ios::trunc);
             }
-
             break;
         }
-
         case 3:
         {
             // Quit
-            Play::DrawSprite("laser", { DISPLAY_WIDTH / 2 + 200, DISPLAY_HEIGHT / 4}, 0);
             if (Play::KeyPressed(Play::KEY_ENTER))
             {
                 return true;
@@ -1002,10 +1089,27 @@ bool GameloopLeaderBoard()
     return false;
 }
 
+// Set Up Leaderboard From Previous Games 
+void SetUpLeaderBoard()
+{
+    int scoreFromLeaderboard = 0;
+
+    std::ifstream LeaderboardRead("Leaderboard.txt");
+    if (LeaderboardRead.is_open())
+    {
+        while (LeaderboardRead >> scoreFromLeaderboard)
+        {
+            // Add All Scores To Current Vector 
+            gameState.leaderboardTopScore.push_back(scoreFromLeaderboard);
+        }
+        LeaderboardRead.close();
+    }
+    std::sort(gameState.leaderboardTopScore.begin(), gameState.leaderboardTopScore.end(), std::greater<>());
+}
+
 // Updates New Score 
 void UploadScore()
 {
-
     // Upload To File For Future Games 
     std::ofstream LeaderboardWrite("Leaderboard.txt", std::ios::app);
     if (LeaderboardWrite.is_open()) {
@@ -1019,4 +1123,56 @@ void UploadScore()
     // In Game Upload
     gameState.leaderboardTopScore.push_back(gameState.score);
     std::sort(gameState.leaderboardTopScore.begin(), gameState.leaderboardTopScore.end(), std::greater<>());
+}
+
+// Sets Up Sound From Previous Game 
+void SetUpSound()
+{
+    int soundSetting = 0;
+
+    std::ifstream SettingRead("Settings.txt");
+    if (SettingRead.is_open())
+    {
+        while (SettingRead >> soundSetting)
+        {
+            gameState.bShouldSoundBeOn = soundSetting;
+        }
+        SettingRead.close();
+    }
+
+    // Sets Sound For Current Game 
+    if (soundSetting == 0)
+    {
+        gameState.isMusicOn = false;
+    }
+    else
+    {
+        gameState.isMusicOn = true;
+    }
+}
+
+// Update Sound For Future And Current Game 
+void UpdateSound()
+{
+    int soundSetting = 0; 
+    if (gameState.bShouldSoundBeOn)
+    {
+        soundSetting = 1;
+        gameState.isMusicOn = true;
+    }
+    else
+    {
+        soundSetting = 0;
+        gameState.isMusicOn = false;
+    }
+
+    // Changes TXT file 
+    std::ofstream SettingWrite("Settings.txt");
+    if (SettingWrite.is_open())
+    {
+
+        SettingWrite << soundSetting;
+ 
+        SettingWrite.close();
+    }
 }
