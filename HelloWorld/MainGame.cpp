@@ -820,8 +820,8 @@ void GameloopGameScene(const float elapsedTime)
         { DISPLAY_WIDTH / 2, 40 }, Play::CENTRE);
     Play::DrawFontText("72px", "SCORE: " + std::to_string(gameState.score),
         { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT - 80 }, Play::CENTRE);
-    Play::DrawFontText("32px", "Multi: x" + std::to_string(std::round(gameState.scoreMultiplier * 10.0f) / 10.0f),
-        { DISPLAY_WIDTH / 2 + 200, DISPLAY_HEIGHT - 80 }, Play::CENTRE);
+    Play::DrawFontText("32px", "Multi: x" + std::to_string(std::round(gameState.scoreMultiplier * 10.0f) / 10.0f).substr(0,4),
+        { DISPLAY_WIDTH / 2 + 500, DISPLAY_HEIGHT - 80 }, Play::CENTRE);
 
     // Display and Turn Off Coin Frenzy After 10 
     if (gameState.isCoinFrenzy)
