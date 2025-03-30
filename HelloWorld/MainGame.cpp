@@ -311,7 +311,7 @@ void UpdateFan()
     }
 
     // Roll A Shield 
-    if (Play::RandomRoll(1500) == 1)
+    if (Play::RandomRoll(2000) == 1)
     {
 
         // Sets Coin Sprite And Animation and Movement 
