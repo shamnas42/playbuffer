@@ -21,7 +21,7 @@ enum Agent8State
 // Different Scenes and Menus
 enum GameloopScreen
 {
-    SLPASH_SCREEN = 0,
+    SPLASH_SCREEN = 0,
     MAIN_MENU,
     GAME_SCENE,
     LEADERBOARD,
@@ -40,22 +40,25 @@ struct MenuDisplay
 struct GameState
 {
     // Timer For Splash Screen 
-    float timer = 0;
+    float timer = 0.0f;
 
     // Score For Game 
     int score{ 0 };
 
     // Coin Frenzy Mode 
     float coinFrenzyTimer = 0.0f;
-    bool isCoinFrenzy = false;
+    bool bIsCoinFrenzy = false;
+
+    // Sheild 
+    bool bIsSheildOn = false; 
 
     // Score Multiplier 
-    float scoreMultiplier = 1;
+    float scoreMultiplier = 1.0f;
     int toolAttackStreak = 0;
 
     // Menu Choices 
-    bool bShouldSoundBeOn = true;
-    bool isMusicOn = true; 
+    bool bShouldSoundBeOn = false;
+    bool bIsMusicOn = false; 
 
     // Menu Choices
     int playerMenuChoice = 1;
@@ -67,7 +70,7 @@ struct GameState
 
     // States for Agent And Scenes 
     Agent8State agentState{ STATE_APPEAR };
-    GameloopScreen gameScreen{ SLPASH_SCREEN };
+    GameloopScreen gameScreen{ SPLASH_SCREEN };
 };
 
 // Global Variable For Updating Game
@@ -82,6 +85,7 @@ enum GameObjectType
     TYPE_TOOL,
     TYPE_COIN,
     TYPE_COIN_POWER,
+    TYPE_SHIELD,
     TYPE_STAR,
     TYPE_LASER,
     TYPE_DESTROYED,
@@ -93,10 +97,10 @@ void UpdateFan();
 void UpdateTools();
 void UpdateCoinsAndStars();
 void UpdateCoinPower();
+void UpdateShield();
 void UpdateLasers();
 void UpdateDestroyed();
 void UpdateAgent8();
-void PrintMenu(const char* textSize, const std::string textContent, const int textLocationX, const int textLocationY);
 void GameloopSplashScreen();
 void DisplayMainMenu();
 bool ChooseMainMenu();
@@ -129,7 +133,6 @@ void MainGameEntry(PLAY_IGNORE_COMMAND_LINE)
     Play::GetGameObject(id_fan).velocity = { 0, -3 };
     Play::GetGameObject(id_fan).animSpeed = 1.0f;
     SetUpLeaderBoard();
-    
 }
 
 // Updates Game Every 60 Times Per Second 
@@ -140,7 +143,7 @@ bool MainGameUpdate(float elapsedTime)
     // Gameloop: Switch To Different Menus And Screens 
     switch (gameState.gameScreen)
     {
-        case SLPASH_SCREEN:
+        case SPLASH_SCREEN:
         {
             GameloopSplashScreen();
             break;
@@ -258,7 +261,7 @@ void UpdateFan()
     GameObject& obj_fan = Play::GetGameObjectByType(TYPE_FAN);
 
     // 1/50 Chance Of Spawning A Driver 
-    if (Play::RandomRoll(50) == 50 && !gameState.isCoinFrenzy)
+    if (Play::RandomRoll(50) == 50 && !gameState.bIsCoinFrenzy)
     {
         // Set Driver Objects And Its Movement 
         int id = Play::CreateGameObject(TYPE_TOOL, obj_fan.pos, 50, "driver");
@@ -283,7 +286,7 @@ void UpdateFan()
     // 1/150 Chance Of Spawning Coin and 1/50 if Coin Frenzy Is On 
     int coinChance = 150; 
 
-    if (gameState.isCoinFrenzy)
+    if (gameState.bIsCoinFrenzy)
     {
         coinChance = 20;
     }
@@ -291,7 +294,7 @@ void UpdateFan()
     if (Play::RandomRoll(coinChance) == 1)
     {
         
-        if (Play::RandomRoll(5) == 1 && !gameState.isCoinFrenzy)
+        if (Play::RandomRoll(5) == 1 && !gameState.bIsCoinFrenzy)
         {
             int id = Play::CreateGameObject(TYPE_COIN_POWER, obj_fan.pos, 25, "coin_power");
             GameObject& obj_coin = Play::GetGameObject(id);
@@ -305,6 +308,17 @@ void UpdateFan()
             obj_coin.velocity = { -3, 0 };
             obj_coin.rotSpeed = 0.1f;
         }
+    }
+
+    // Roll A Shield 
+    if (Play::RandomRoll(1500) == 1)
+    {
+
+        // Sets Coin Sprite And Animation and Movement 
+        int id = Play::CreateGameObject(TYPE_SHIELD, obj_fan.pos, 30, "shield");
+        GameObject& obj_sheild = Play::GetGameObject(id);
+        obj_sheild.velocity = { -3, 0 };
+        
     }
 
     // Constantly Updates Fan 
@@ -337,14 +351,22 @@ void UpdateTools()
         // If Player Is Still Alive and Gets Hit 
         if (gameState.agentState != STATE_DEAD && Play::IsColliding(obj_tool, obj_agent8))
         {
-            // Changes Players State To Dead After Getting Hit 
-            if (gameState.bShouldSoundBeOn)
+            if (!gameState.bIsSheildOn)
             {
-                Play::StopAudio("music");
-                Play::PlayAudio("die");
-                gameState.isMusicOn = false; 
+                
+                // Changes Players State To Dead After Getting Hit 
+                if (gameState.bShouldSoundBeOn)
+                {
+                    Play::StopAudio("music");
+                    Play::PlayAudio("die");
+                    gameState.bIsMusicOn = false;
+                }
+                gameState.agentState = STATE_DEAD;
             }
-            gameState.agentState = STATE_DEAD;
+            else
+            {
+                ResetGameScreen();
+            }
         }
         Play::UpdateGameObject(obj_tool);
 
@@ -450,7 +472,7 @@ void UpdateCoinPower()
             // More Points and Turn Frency On And Reset Timer
             hasCollided = true;
             gameState.score += (int)(1000 * gameState.scoreMultiplier);
-            gameState.isCoinFrenzy = true;
+            gameState.bIsCoinFrenzy = true;
             gameState.coinFrenzyTimer = 0.0f;
             if (gameState.bShouldSoundBeOn)
             {
@@ -473,6 +495,47 @@ void UpdateCoinPower()
     }
 }
 
+void UpdateShield()
+{
+    // Player Reference and Coin Vector 
+    GameObject& obj_agent8 = Play::GetGameObjectByType(TYPE_AGENT8);
+    std::vector<int> vShield = Play::CollectGameObjectIDsByType(TYPE_SHIELD);
+
+    // Looks Over Each Shield In Vector 
+    for (int id_shield : vShield)
+    {
+        // Reference For Shield Object 
+        GameObject& obj_shield = Play::GetGameObject(id_shield);
+        bool hasCollided = false;
+
+        // If Player Has Collided With Sheild Power Up 
+        if (Play::IsColliding(obj_shield, obj_agent8))
+        {
+            // Turn On Sheild When Colliding 
+            hasCollided = true;
+            gameState.score += (int)(500 * gameState.scoreMultiplier);
+            gameState.bIsSheildOn = true; 
+
+            if (gameState.bShouldSoundBeOn)
+            {
+                Play::PlayAudio("collect");
+            }
+        }
+
+        // Updates Coin Power Up 
+        Play::UpdateGameObject(obj_shield);
+
+        // Rotate Coin Power Up 
+        Play::DrawSprite("shield", obj_shield.pos, 0);
+
+        // If Coin Has Been Hit Or Collided Then Desttory It 
+        if (!Play::IsVisible(obj_shield) || hasCollided)
+        {
+            Play::DestroyGameObject(id_shield);
+        }
+    }
+}
+
 // Updates Lasers Spawned 
 void UpdateLasers()
 {
@@ -481,6 +544,7 @@ void UpdateLasers()
     std::vector<int> vTools = Play::CollectGameObjectIDsByType(TYPE_TOOL);
     std::vector<int> vCoins = Play::CollectGameObjectIDsByType(TYPE_COIN);
     std::vector<int> vCoinPowers = Play::CollectGameObjectIDsByType(TYPE_COIN_POWER);
+    std::vector<int> vShields = Play::CollectGameObjectIDsByType(TYPE_SHIELD);
 
     // Checks Every Lazer In Vector
     for (int id_laser : vLasers)
@@ -552,6 +616,24 @@ void UpdateLasers()
                 // Resets Streak 
                 gameState.toolAttackStreak = 0;
                 gameState.scoreMultiplier = 1;
+            }
+        }
+
+        for (int id_shield : vShields)
+        {
+            // Each Shield 
+            GameObject& obj_shield = Play::GetGameObject(id_shield);
+            // Checks If Lazer Hits Shield 
+            if (Play::IsColliding(obj_laser, obj_shield))
+            {
+                // Changes Type Of Shield To Destroyed
+                hasCollided = true;
+                obj_shield.type = TYPE_DESTROYED;
+
+                if (gameState.bShouldSoundBeOn)
+                {
+                    Play::PlayAudio("error");
+                }
             }
         }
 
@@ -665,12 +747,6 @@ void UpdateAgent8()
     Play::DrawObjectRotated(obj_agent8);
 }
 
-// Prints Each Menu Display 
-void PrintMenu(const char* textSize, const std::string textContent, const int textLocationX, const int textLocationY)
-{
-    Play::DrawFontText(textSize, textContent, { textLocationX, textLocationY }, Play::CENTRE);
-}
-
 // Gameloop For Slpash Screen 
 void GameloopSplashScreen()
 {
@@ -678,6 +754,8 @@ void GameloopSplashScreen()
     Play::ClearDrawingBuffer(Play::cBlack);
     Play::DrawSprite("playbuffer_title", {DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2}, 0); 
     Play::PresentDrawingBuffer();
+
+  
 
     // 4 Seconds In Slpash Screen
     if (gameState.timer > 4)
@@ -709,17 +787,20 @@ void DisplayMainMenu()
 
         if (i != 3)
         {
-            PrintMenu(mainMenuDisplayArray[i].fontSize, mainMenuDisplayArray[i].menuContent, mainMenuDisplayArray[i].menuXLocation, mainMenuDisplayArray[i].menuYLocation * (menuOptionNumber - i));
+            Play::DrawFontText(mainMenuDisplayArray[i].fontSize, mainMenuDisplayArray[i].menuContent,
+                { mainMenuDisplayArray[i].menuXLocation, mainMenuDisplayArray[i].menuYLocation * (menuOptionNumber - i)}, Play::CENTRE);
         }
         else
         {
             if (gameState.bShouldSoundBeOn)
             {
-                PrintMenu(mainMenuDisplayArray[i].fontSize, mainMenuDisplayArray[i].menuContent + "Off", mainMenuDisplayArray[i].menuXLocation, mainMenuDisplayArray[i].menuYLocation * (menuOptionNumber - i));
+                Play::DrawFontText(mainMenuDisplayArray[i].fontSize, mainMenuDisplayArray[i].menuContent + "Off",
+                    { mainMenuDisplayArray[i].menuXLocation, mainMenuDisplayArray[i].menuYLocation * (menuOptionNumber - i) }, Play::CENTRE);
             }
             else
             {
-                PrintMenu(mainMenuDisplayArray[i].fontSize, mainMenuDisplayArray[i].menuContent + "On", mainMenuDisplayArray[i].menuXLocation, mainMenuDisplayArray[i].menuYLocation * (menuOptionNumber - i));
+                Play::DrawFontText(mainMenuDisplayArray[i].fontSize, mainMenuDisplayArray[i].menuContent + "On",
+                    { mainMenuDisplayArray[i].menuXLocation, mainMenuDisplayArray[i].menuYLocation * (menuOptionNumber - i) }, Play::CENTRE);
             }
         }
     }
@@ -772,13 +853,13 @@ bool ChooseMainMenu()
                 {
                     Play::StopAudio("music");
                     gameState.bShouldSoundBeOn = false;
-                    gameState.isMusicOn = false; 
+                    gameState.bIsMusicOn = false; 
                 }
                 else
                 {
                     gameState.bShouldSoundBeOn = true;
                     Play::StartAudioLoop("music");
-                    gameState.isMusicOn = true;
+                    gameState.bIsMusicOn = true;
                 }
                 UpdateSound();
             }
@@ -814,6 +895,7 @@ void GameloopGameScene(const float elapsedTime)
     UpdateTools();
     UpdateCoinsAndStars();
     UpdateCoinPower();
+    UpdateShield();
     UpdateLasers();
     UpdateDestroyed();
     Play::DrawFontText("32px", "ARROW KEYS TO MOVE UP AND DOWN AND SPACE TO FIRE",
@@ -823,13 +905,25 @@ void GameloopGameScene(const float elapsedTime)
     Play::DrawFontText("32px", "Multi: x" + std::to_string(std::round(gameState.scoreMultiplier * 10.0f) / 10.0f).substr(0,4),
         { DISPLAY_WIDTH / 2 + 500, DISPLAY_HEIGHT - 80 }, Play::CENTRE);
 
+    if (gameState.bIsSheildOn)
+    {
+        Play::DrawFontText("32px", "Shield: ON",
+            { DISPLAY_WIDTH / 2 + 500, DISPLAY_HEIGHT - 120 }, Play::CENTRE);
+    }
+    else 
+    {
+        Play::DrawFontText("32px", "Shield: OFF",
+            { DISPLAY_WIDTH / 2 + 500, DISPLAY_HEIGHT - 120 }, Play::CENTRE);
+    }
+
+
     // Display and Turn Off Coin Frenzy After 10 
-    if (gameState.isCoinFrenzy)
+    if (gameState.bIsCoinFrenzy)
     {
         gameState.coinFrenzyTimer += elapsedTime;
         if (gameState.coinFrenzyTimer > 5)
         {
-            gameState.isCoinFrenzy = false;
+            gameState.bIsCoinFrenzy = false;
         }
     }
 
@@ -852,18 +946,27 @@ void ResetGameScreen()
     obj_agent8.frame = 0;
 
     // Turn On Music When Reset
-    if (gameState.bShouldSoundBeOn && !gameState.isMusicOn)
+    if (gameState.bShouldSoundBeOn && !gameState.bIsMusicOn)
     {
         Play::StartAudioLoop("music");
+        gameState.bIsMusicOn = true; 
     }
 
-    // Reset Score, Muliplier, Streak, Coin Frenzy 
-    gameState.score = 0;
-    gameState.isCoinFrenzy = false;
+    // Doesn't Reset Score Is Shield Is Active 
+    if (!gameState.bIsSheildOn)
+    {
+        gameState.score = 0;
+    }
+
+    // Reset Muliplier, Streak, Coin Frenzy, And Shield When Hit 
+    gameState.bIsCoinFrenzy = false;
     gameState.scoreMultiplier = 1;
     gameState.toolAttackStreak = 0;
 
-    // Destoryed all Coins, Coin Power Ups, and Tools 
+
+    gameState.bIsSheildOn = false; 
+
+    // Destoryed all Coins, Coin Power Ups, Shields, and Tools 
     for (int id_obj : Play::CollectGameObjectIDsByType(TYPE_TOOL))
     {
         Play::GetGameObject(id_obj).type = TYPE_DESTROYED;
@@ -875,6 +978,11 @@ void ResetGameScreen()
     }
 
     for (int id_obj : Play::CollectGameObjectIDsByType(TYPE_COIN_POWER))
+    {
+        Play::GetGameObject(id_obj).type = TYPE_DESTROYED;
+    }
+
+    for (int id_obj : Play::CollectGameObjectIDsByType(TYPE_SHIELD))
     {
         Play::GetGameObject(id_obj).type = TYPE_DESTROYED;
     }
@@ -905,7 +1013,8 @@ void DisplayEndScreen()
     // Shows Displays 
     for (int i = 0; i < menuOptionNumber; i++)
     {
-        PrintMenu(endMenuDisplayArray[i].fontSize, endMenuDisplayArray[i].menuContent, endMenuDisplayArray[i].menuXLocation, endMenuDisplayArray[i].menuYLocation * (menuOptionNumber - i));
+        Play::DrawFontText(endMenuDisplayArray[i].fontSize, endMenuDisplayArray[i].menuContent,
+            { endMenuDisplayArray[i].menuXLocation, endMenuDisplayArray[i].menuYLocation * (menuOptionNumber - i) }, Play::CENTRE);
     }
 }
 
@@ -1000,7 +1109,8 @@ void DisplayLeaderBoardMenu()
     // Print Each Setting Display 
     for (int i = 0; i < menuOptionNumber; i++)
     {
-        PrintMenu(leaderMenuDisplayArray[i].fontSize, leaderMenuDisplayArray[i].menuContent, leaderMenuDisplayArray[i].menuXLocation, leaderMenuDisplayArray[i].menuYLocation * (menuOptionNumber - i));
+        Play::DrawFontText(leaderMenuDisplayArray[i].fontSize, leaderMenuDisplayArray[i].menuContent,
+            { leaderMenuDisplayArray[i].menuXLocation,leaderMenuDisplayArray[i].menuYLocation * (menuOptionNumber - i) }, Play::CENTRE);
     }
 }
 
@@ -1012,7 +1122,9 @@ void DisplayLeaderBoardScores()
     const int menuY = DISPLAY_HEIGHT / 10;
 
     // Title 
-    PrintMenu("64px", "Leaderboard Top 8", menuX, menuY * 9 );
+
+    Play::DrawFontText("64px", "Leaderboard Top 8",
+        { menuX, menuY * 9 }, Play::CENTRE);
 
     // To Prevent Crash From Less Than 8 Scores 
     if (gameState.leaderboardTopScore.size() < 8)
@@ -1023,7 +1135,8 @@ void DisplayLeaderBoardScores()
     // Score Display 
     for (int i = 0; i < scoreAmount; i++)
     {
-        PrintMenu("32px", std::to_string(i + 1) + ". " + std::to_string(gameState.leaderboardTopScore[i]), menuX, menuY * (scoreAmount - i));
+        Play::DrawFontText("32px", std::to_string(i + 1) + ". " + std::to_string(gameState.leaderboardTopScore[i]),
+            { menuX,menuY * (scoreAmount - i) }, Play::CENTRE);
     }
 }
 
@@ -1143,11 +1256,12 @@ void SetUpSound()
     // Sets Sound For Current Game 
     if (soundSetting == 0)
     {
-        gameState.isMusicOn = false;
+        gameState.bIsMusicOn = false;
     }
-    else
+    else if (soundSetting == 1)
     {
-        gameState.isMusicOn = true;
+        gameState.bIsMusicOn = true;
+
     }
 }
 
@@ -1158,12 +1272,12 @@ void UpdateSound()
     if (gameState.bShouldSoundBeOn)
     {
         soundSetting = 1;
-        gameState.isMusicOn = true;
+        gameState.bIsMusicOn = true;
     }
     else
     {
         soundSetting = 0;
-        gameState.isMusicOn = false;
+        gameState.bIsMusicOn = false;
     }
 
     // Changes TXT file 

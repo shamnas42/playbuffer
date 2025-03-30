@@ -82,6 +82,9 @@
     <Image Include="Data\Sprites\coin_power_4x3.png">
       <Filter>Resource\Sprites</Filter>
     </Image>
+    <Image Include="Data\Sprites\shield.png">
+      <Filter>Resource\Sprites</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <Media Include="Data\Audio\snd_collect.wav">
@@ -115,5 +118,6 @@
   <ItemGroup>
     <Text Include="Leaderboard.txt" />
     <Text Include="Settings.txt" />
+    <Text Include="README.md" />
   </ItemGroup>
 </Project>

@@ -211,6 +211,7 @@
     <Image Include="Data\Sprites\font72px_10x10.png" />
     <Image Include="Data\Sprites\laser_2.png" />
     <Image Include="Data\Sprites\playbuffer_title.png" />
+    <Image Include="Data\Sprites\shield.png" />
     <Image Include="Data\Sprites\spanner.png" />
     <Image Include="Data\Sprites\star.png" />
   </ItemGroup>
@@ -227,6 +228,7 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="Leaderboard.txt" />
+    <Text Include="README.md" />
     <Text Include="Settings.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
